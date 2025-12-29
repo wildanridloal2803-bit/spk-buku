@@ -87,6 +87,7 @@ export default function AuthPage() {
                         {isLogin ? 'Selamat Datang' : 'Buat Akun'}
                     </h1>
                     <p className="text-gray-500 text-sm mt-1">Sistem Pendukung Keputusan (SAW)</p>
+                    <p className="text-gray-500 text-sm mt-1">By Aliyah Agency</p>
                 </div>
 
                 <AnimatePresence mode='wait'>

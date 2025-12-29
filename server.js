@@ -16,12 +16,18 @@ const PORT = process.env.PORT || 5000;
 // Kalau port Vite kamu beda, sesuaikan di sini.
 app.use(cors({
     // Izinkan Frontend Vercel DAN Localhost
-    origin: [
+    origin: true [
         'http://localhost:5173', 
-        'https://nama-project-frontend-kamu.vercel.app' // Nanti kita update ini setelah frontend deploy
+        'https://spk-frontend-eta.vercel.app' // Nanti kita update ini setelah frontend deploy
     ], 
     credentials: true
 }));
+
+// app.use(cors({
+//     // Izinkan Frontend Vercel DAN Localhost
+//     origin: true, 
+//     credentials: true
+// }));
 
 // Agar backend bisa membaca data JSON yang dikirim dari Frontend
 // app.use(express.json());

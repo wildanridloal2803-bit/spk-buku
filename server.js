@@ -15,8 +15,11 @@ const PORT = process.env.PORT || 5000;
 // Origin 'http://localhost:5173' adalah port default Vite. 
 // Kalau port Vite kamu beda, sesuaikan di sini.
 app.use(cors({
-    origin: 'http://localhost:5173',
-    'https://nama-project-frontend-kamu.vercel.app', 
+    // Izinkan Frontend Vercel DAN Localhost
+    origin: [
+        'http://localhost:5173', 
+        'https://nama-project-frontend-kamu.vercel.app' // Nanti kita update ini setelah frontend deploy
+    ], 
     credentials: true
 }));
 

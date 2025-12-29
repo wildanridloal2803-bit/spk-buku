@@ -2,6 +2,7 @@ import axios from 'axios';
 
 
 const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+console.log("🔗 Frontend nembak ke:", baseURL);
 // Ganti baseURL sesuai port backend Node.js kamu
 const api = axios.create({
     baseURL: baseURL,

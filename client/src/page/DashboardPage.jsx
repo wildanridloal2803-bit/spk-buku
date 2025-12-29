@@ -976,31 +976,46 @@ const ViewProfile = ({ user, setUser }) => {
         cariIdSaya();
     }, []);
 
+    const [fileFoto, setFileFoto] = useState(null); // State khusus buat nyimpen file mentah
+
+    // 1. HANDLE GANTI FOTO (Cuma buat preview & simpan file mentah)
     const handleImageChange = (e) => {
         const file = e.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onloadend = () => setPreview(reader.result);
-        reader.readAsDataURL(file);
+        if (file) {
+            setFileFoto(file); // Simpan file aslinya buat dikirim nanti
+            setPreview(URL.createObjectURL(file)); // Buat preview lokal aja
+        }
     };
 
+    // 2. HANDLE SAVE (PAKAI FORMDATA)
     const handleSave = async () => {
-        if(!myId) return Swal.fire("Loading...", "Tunggu sebentar, sedang memuat data user", "info");
+        if(!myId) return Swal.fire("Loading...", "Tunggu data user...", "info");
+
+        // GUNAKAN FORMDATA (Wajib buat kirim file lewat Multer)
+        const formData = new FormData();
+        formData.append('nama_lengkap', nama);
+        formData.append('username', localStorage.getItem('user_name')); // atau username dari state
+        if (password) formData.append('password', password);
+        
+        // Kuncinya disini: Masukkan file mentah ke 'avatar'
+        if (fileFoto) {
+            formData.append('avatar', fileFoto);
+        }
 
         try {
-            // Kita pakai endpoint update user biasa tapi nembak ID sendiri
-            const payload = { nama_lengkap: nama, avatar: preview, password: password || undefined };
-            
-            // Perhatikan route ini: Kita pakai PUT ke /users/:id
-            await api.put(`/users/${myId}`, payload); // Nanti backend harus support PUT /users/:id
+            // Header 'Content-Type': 'multipart/form-data' itu otomatis dipasang axios kalau kita kirim FormData
+            await api.put(`/users/${myId}`, formData);
 
+            // Update UI
             setUser({ ...user, nama: nama, avatar: preview });
-            localStorage.setItem('user_name', nama); // Update nama di storage biar persist
+            localStorage.setItem('user_name', nama);
+            
             Swal.fire("Berhasil", "Profil diperbarui!", "success");
             setPassword("");
+            setFileFoto(null); // Reset file
         } catch (err) {
             console.error(err);
-            Swal.fire("Gagal", "Gagal update profil", "error");
+            Swal.fire("Gagal", err.response?.data?.msg || "Gagal update profil", "error");
         }
     };
 

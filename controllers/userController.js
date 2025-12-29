@@ -28,36 +28,35 @@ export const createUser = async (req, res) => {
     } catch (error) { res.status(500).json({msg: error.message}); }
 }
 
-// ... import yang sudah ada ...
 
-// UPDATE PROFILE (Nama, Password, Avatar)
-
-// UPDATE USER (Dengan Cloudinary)
 export const updateUser = async (req, res) => {
     const { id } = req.params;
-    const { nama_lengkap, username, password, avatar } = req.body; // Avatar isinya Base64 string
+    // Data teks ada di req.body, Data file ada di req.file
+    const { nama_lengkap, username, password } = req.body;
     
     try {
         let finalAvatarUrl = null;
 
-        // 1. Jika ada avatar base64 dikirim, Upload ke Cloudinary
-        if (avatar && avatar.startsWith('data:image')) {
+        // 1. JIKA ADA FILE DIUPLOAD
+        if (req.file) {
+            // Kita harus convert Buffer ke Base64 lagi biar bisa diupload ke Cloudinary
+            // Atau pakai stream, tapi cara ini paling ringkas buat kodingan pendek:
+            const b64 = Buffer.from(req.file.buffer).toString('base64');
+            const dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+            
             try {
-                const uploadRes = await cloudinary.uploader.upload(avatar, {
-                    folder: 'spk-buku-users', // Nama folder di Cloudinary
+                const uploadRes = await cloudinary.uploader.upload(dataURI, {
+                    folder: 'spk-buku-users',
                     resource_type: 'image'
                 });
-                finalAvatarUrl = uploadRes.secure_url; // Ambil URL asli (https://...)
-            } catch (err) {
-                console.error("Gagal Upload Cloudinary:", err);
-                return res.status(500).json({msg: "Gagal upload gambar ke server cloud"});
+                finalAvatarUrl = uploadRes.secure_url;
+            } catch (uploadErr) {
+                console.error("Gagal Upload:", uploadErr);
+                return res.status(500).json({msg: "Gagal upload ke Cloudinary"});
             }
-        } else {
-            // Kalau tidak ganti gambar, pakai yang lama (bisa handle di frontend/disini)
-            finalAvatarUrl = avatar; 
         }
 
-        // 2. Siapkan Query Database
+        // 2. QUERY UPDATE DATABASE
         let query = "UPDATE users SET nama_lengkap=?, username=?";
         let params = [nama_lengkap, username];
 
@@ -78,7 +77,6 @@ export const updateUser = async (req, res) => {
 
         await db.query(query, params);
         
-        // Kirim balik URL baru ke frontend biar langsung update
         res.json({msg: "Data User Berhasil Diupdate", avatar: finalAvatarUrl});
 
     } catch (error) {
@@ -86,6 +84,65 @@ export const updateUser = async (req, res) => {
         res.status(500).json({msg: error.message});
     }
 };
+
+// ... import yang sudah ada ...
+
+// UPDATE PROFILE (Nama, Password, Avatar)
+
+// UPDATE USER (Dengan Cloudinary)
+// export const updateUser = async (req, res) => {
+//     const { id } = req.params;
+//     const { nama_lengkap, username, password, avatar } = req.body; // Avatar isinya Base64 string
+    
+//     try {
+//         let finalAvatarUrl = null;
+
+//         // 1. Jika ada avatar base64 dikirim, Upload ke Cloudinary
+//         if (avatar && avatar.startsWith('data:image')) {
+//             try {
+//                 const uploadRes = await cloudinary.uploader.upload(avatar, {
+//                     folder: 'spk-buku-users', // Nama folder di Cloudinary
+//                     resource_type: 'image'
+//                 });
+//                 finalAvatarUrl = uploadRes.secure_url; // Ambil URL asli (https://...)
+//             } catch (err) {
+//                 console.error("Gagal Upload Cloudinary:", err);
+//                 return res.status(500).json({msg: "Gagal upload gambar ke server cloud"});
+//             }
+//         } else {
+//             // Kalau tidak ganti gambar, pakai yang lama (bisa handle di frontend/disini)
+//             finalAvatarUrl = avatar; 
+//         }
+
+//         // 2. Siapkan Query Database
+//         let query = "UPDATE users SET nama_lengkap=?, username=?";
+//         let params = [nama_lengkap, username];
+
+//         if (finalAvatarUrl) {
+//             query += ", avatar=?";
+//             params.push(finalAvatarUrl);
+//         }
+
+//         if (password && password.trim() !== "") {
+//             const salt = await bcrypt.genSalt();
+//             const hashPassword = await bcrypt.hash(password, salt);
+//             query += ", password=?";
+//             params.push(hashPassword);
+//         }
+
+//         query += " WHERE id_user=?";
+//         params.push(id);
+
+//         await db.query(query, params);
+        
+//         // Kirim balik URL baru ke frontend biar langsung update
+//         res.json({msg: "Data User Berhasil Diupdate", avatar: finalAvatarUrl});
+
+//     } catch (error) {
+//         if(error.code === 'ER_DUP_ENTRY') return res.status(400).json({msg: "Username sudah dipakai!"});
+//         res.status(500).json({msg: error.message});
+//     }
+// };
 // EDIT USER (Bisa Ganti Nama, Username, & Password)
 // export const updateUser = async (req, res) => {
 //     const { id } = req.params;

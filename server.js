@@ -29,7 +29,7 @@ const corsOptions = {
         }
     },
     credentials: true, // Izinkan cookie/token lewat
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Izinkan method ini
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'], // Izinkan method ini
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept']
 };
 

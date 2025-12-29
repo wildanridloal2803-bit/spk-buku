@@ -7,7 +7,7 @@ import router from "./routes/index.js";
 
 dotenv.config();
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 4000;
 
 // --- 1. SETTING CORS (VERSI AMAN VERCEL) ---
 // Kita deklarasikan dulu whitelist domainnya

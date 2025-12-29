@@ -452,22 +452,182 @@ const ViewKriteria = () => {
 };
 
 
+// 4. HITUNG SAW VIEW (KOMPONEN YANG HILANG)
+const ViewHitungSAW = () => {
+    const [hasil, setHasil] = useState([]);
+    const [loading, setLoading] = useState(false);
 
+    // Fungsi untuk memanggil perhitungan dari Backend
+    const hitungSAW = async () => {
+        setLoading(true);
+        try {
+            const res = await api.get('/hitung-saw');
+            // Backend biasanya return { status, data: [...] } atau langsung array
+            // Sesuaikan dengan respon backend SPKController kamu
+            const dataHasil = res.data.data || res.data; 
+            setHasil(dataHasil);
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Perhitungan Selesai!',
+                text: 'Data berhasil diurutkan berdasarkan nilai preferensi tertinggi.',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        } catch (err) {
+            console.error(err);
+            Swal.fire('Error', 'Gagal menghitung SAW. Pastikan data Kriteria & Buku tidak kosong/nilai 0.', 'error');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Jalankan hitung otomatis saat menu dibuka
+    useEffect(() => {
+        hitungSAW();
+    }, []);
+
+    // Fungsi Simpan ke Laporan
+    const handleSimpanLaporan = async () => {
+        if (hasil.length === 0) return Swal.fire('Data Kosong', 'Tidak ada hasil untuk disimpan.', 'warning');
+
+        const { value: judul } = await Swal.fire({
+            title: 'Simpan Laporan',
+            input: 'text',
+            inputLabel: 'Berikan Judul/Keterangan Laporan',
+            inputPlaceholder: 'Contoh: Laporan Periode Januari 2024',
+            showCancelButton: true,
+            inputValidator: (value) => {
+                if (!value) return 'Judul tidak boleh kosong!';
+            }
+        });
+
+        if (judul) {
+            try {
+                // Kirim data hasil ranking (JSON) ke tabel laporan
+                await api.post('/laporan', {
+                    keterangan: judul,
+                    data_json: JSON.stringify(hasil) // Array hasil dikonversi jadi string JSON
+                });
+                Swal.fire('Berhasil', 'Laporan telah disimpan ke database.', 'success');
+            } catch (error) {
+                Swal.fire('Gagal', 'Gagal menyimpan laporan.', 'error');
+            }
+        }
+    };
+
+    return (
+        <div className="bg-white p-6 rounded-2xl shadow-sm">
+            <div className="flex justify-between items-center mb-6">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Hasil Perhitungan SAW</h2>
+                    <p className="text-sm text-gray-500">Sistem otomatis mengurutkan buku terbaik.</p>
+                </div>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={hitungSAW} 
+                        disabled={loading}
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                    >
+                        {loading ? <span className="animate-spin">↻</span> : <FaCalculator />} 
+                        Hitung Ulang
+                    </button>
+                    <button 
+                        onClick={handleSimpanLaporan} 
+                        className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2"
+                    >
+                        <FaSave /> Simpan Laporan
+                    </button>
+                </div>
+            </div>
+
+            {/* Tabel Ranking */}
+            <div className="overflow-x-auto border rounded-xl">
+                <table className="w-full text-left border-collapse">
+                    <thead className="bg-slate-800 text-white">
+                        <tr>
+                            <th className="p-3 text-center w-20">Rank</th>
+                            <th className="p-3">Judul Buku</th>
+                            <th className="p-3">Penulis</th>
+                            <th className="p-3 text-right">Nilai Preferensi (V)</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y">
+                        {hasil.length > 0 ? (
+                            hasil.map((item, index) => (
+                                <tr key={index} className={`hover:bg-gray-50 ${item.rank === 1 ? 'bg-yellow-50' : ''}`}>
+                                    <td className="p-3 text-center font-bold">
+                                        {item.rank === 1 ? '🥇 1' : 
+                                         item.rank === 2 ? '🥈 2' : 
+                                         item.rank === 3 ? '🥉 3' : item.rank}
+                                    </td>
+                                    <td className="p-3 font-medium">{item.judul_buku}</td>
+                                    <td className="p-3 text-gray-600">{item.penulis}</td>
+                                    <td className="p-3 text-right font-bold text-blue-600">
+                                        {typeof item.total_nilai === 'number' ? item.total_nilai.toFixed(4) : item.total_nilai}
+                                    </td>
+                                </tr>
+                            ))
+                        ) : (
+                            <tr>
+                                <td colSpan="4" className="p-8 text-center text-gray-400">
+                                    {loading ? 'Sedang menghitung...' : 'Data tidak tersedia. Cek data Buku & Kriteria.'}
+                                </td>
+                            </tr>
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
 
 // 5. LAPORAN VIEW
 // GANTI ViewLaporan dengan yang ini biar detailnya rapi
 const ViewLaporan = () => {
     const [laporan, setLaporan] = useState([]);
-    const [selectedDetail, setSelectedDetail] = useState(null); // Menyimpan object laporan lengkap (bukan cuma array json)
+    const [selectedDetail, setSelectedDetail] = useState(null);
 
+    // --- FUNGSI AMBIL DATA (DIPERBAIKI PARSINGNYA) ---
     const fetchLaporan = async () => {
         try {
             const res = await api.get('/laporan');
-            // Parsing data JSON
-            const dataRapih = res.data.map(item => ({
-                ...item,
-                data_json: typeof item.data_json === 'string' ? JSON.parse(item.data_json) : item.data_json
-            }));
+            
+            // Kita proses datanya satu per satu biar aman
+            const dataRapih = res.data.map(item => {
+                let parsedData = []; // Default kosong
+
+                try {
+                    // Cek 1: Apakah datanya String JSON? Kita Parse.
+                    if (typeof item.data_json === 'string') {
+                        parsedData = JSON.parse(item.data_json);
+                    } 
+                    // Cek 2: Apakah datanya sudah jadi Object/Array? (Kadang driver MySQL otomatis parse)
+                    else if (typeof item.data_json === 'object' && item.data_json !== null) {
+                        parsedData = item.data_json;
+                    }
+                    // Cek 3: Apakah datanya null?
+                    else {
+                        parsedData = [];
+                    }
+
+                    // Pastikan hasil akhirnya Array. Kalau object tunggal, bungkus jadi array
+                    if (!Array.isArray(parsedData) && parsedData) {
+                        parsedData = [parsedData];
+                    }
+
+                } catch (e) {
+                    console.error("Gagal membaca data laporan ID:", item.id_laporan, e);
+                    parsedData = []; 
+                }
+
+                return {
+                    ...item,
+                    data_json: parsedData || [] // Pastikan tidak pernah null
+                };
+            });
+
+            console.log("Data Laporan Siap:", dataRapih); // Cek Console (F12) kalau masih blank
             setLaporan(dataRapih);
         } catch (err) { console.error(err); }
     };
@@ -481,64 +641,63 @@ const ViewLaporan = () => {
         }
     };
 
-    // --- FUNGSI DOWNLOAD EXCEL ---
     const handleDownloadExcel = () => {
         if (!selectedDetail) return;
-        
-        // Siapkan data untuk excel
         const dataSheet = selectedDetail.data_json.map(item => ({
             Rank: item.rank,
             Judul: item.judul_buku,
             Penulis: item.penulis,
             Nilai_Preferensi: item.total_nilai
         }));
-
         const wb = XLSX.utils.book_new();
         const ws = XLSX.utils.json_to_sheet(dataSheet);
         XLSX.utils.book_append_sheet(wb, ws, "Laporan SPK");
         XLSX.writeFile(wb, `Laporan_${selectedDetail.keterangan}.xlsx`);
     };
 
-    // --- FUNGSI DOWNLOAD PDF ---
-    const handleDownloadPDF = () => {
+    const handlePrintBrowser = () => {
         if (!selectedDetail) return;
-        
-        const doc = new jsPDF();
-        doc.text(`Laporan Hasil SPK: ${selectedDetail.keterangan}`, 14, 15);
-        doc.setFontSize(10);
-        doc.text(`Tanggal Cetak: ${new Date().toLocaleString()}`, 14, 22);
-
-        const tableColumn = ["Rank", "Judul Buku", "Penulis", "Nilai Akhir"];
-        const tableRows = [];
+        const printWindow = window.open('', '', 'height=650,width=900');
+        printWindow.document.write('<html><head><title>Cetak Laporan</title>');
+        printWindow.document.write(`
+            <style>
+                body { font-family: sans-serif; padding: 20px; }
+                h2, h4, p { text-align: center; margin: 5px 0; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #333; padding: 8px; text-align: left; font-size: 12px; }
+                th { background-color: #f2f2f2; }
+                .rank-1 { background-color: #fff9c4; font-weight: bold; }
+                .footer { margin-top: 30px; text-align: right; font-size: 12px; }
+            </style>
+        `);
+        printWindow.document.write('</head><body>');
+        printWindow.document.write(`<h2>LAPORAN HASIL SPK</h2><h4>"${selectedDetail.keterangan}"</h4><p>Tanggal: ${new Date().toLocaleString()}</p><hr/>`);
+        printWindow.document.write('<table><thead><tr><th>Rank</th><th>Judul Buku</th><th>Penulis</th><th style="text-align:right">Nilai Akhir</th></tr></thead><tbody>');
 
         selectedDetail.data_json.forEach(item => {
-            const rowData = [
-                item.rank,
-                item.judul_buku,
-                item.penulis,
-                item.total_nilai
-            ];
-            tableRows.push(rowData);
+            printWindow.document.write(`
+                <tr ${item.rank === 1 ? 'class="rank-1"' : ''}>
+                    <td>#${item.rank}</td>
+                    <td>${item.judul_buku}</td>
+                    <td>${item.penulis}</td>
+                    <td style="text-align:right">${Number(item.total_nilai).toFixed(4)}</td>
+                </tr>
+            `);
         });
 
-        doc.autoTable({
-            head: [tableColumn],
-            body: tableRows,
-            startY: 30,
-        });
-
-        doc.save(`Laporan_${selectedDetail.keterangan}.pdf`);
+        printWindow.document.write('</tbody></table>');
+        printWindow.document.write('</body></html>');
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
     };
 
     return (
         <div className="bg-white p-6 rounded-2xl shadow-sm relative">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">Arsip Laporan</h2>
             
-            {/* List Laporan */}
             {laporan.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 border border-dashed border-gray-300 rounded-xl">
-                    <p>Belum ada laporan.</p>
-                </div>
+                <div className="p-8 text-center text-gray-400 border border-dashed border-gray-300 rounded-xl"><p>Belum ada laporan.</p></div>
             ) : (
                 <div className="space-y-3">
                     {laporan.map((item) => (
@@ -548,10 +707,7 @@ const ViewLaporan = () => {
                                 <p className="text-xs text-gray-500">{new Date(item.tanggal).toLocaleString()}</p>
                             </div>
                             <div className="flex gap-2">
-                                {/* Simpan seluruh object item ke state selectedDetail */}
-                                <button onClick={() => setSelectedDetail(item)} className="text-blue-600 text-sm font-semibold hover:underline">
-                                    Lihat Detail & Cetak
-                                </button>
+                                <button onClick={() => setSelectedDetail(item)} className="text-blue-600 text-sm font-semibold hover:underline">Lihat Detail & Cetak</button>
                                 <button onClick={() => hapusLaporan(item.id_laporan)} className="text-red-500 p-2 hover:bg-red-50 rounded"><FaTrash /></button>
                             </div>
                         </div>
@@ -559,11 +715,10 @@ const ViewLaporan = () => {
                 </div>
             )}
 
-            {/* --- MODAL POPUP DETAIL --- */}
+            {/* --- MODAL POPUP DETAIL (YANG TADI BLANK) --- */}
             {selectedDetail && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-                        {/* Header Modal */}
                         <div className="p-4 border-b flex justify-between items-center bg-gray-50">
                             <div>
                                 <h3 className="font-bold text-lg">{selectedDetail.keterangan}</h3>
@@ -572,17 +727,15 @@ const ViewLaporan = () => {
                             <button onClick={() => setSelectedDetail(null)} className="text-gray-500 hover:text-red-500 font-bold text-2xl">&times;</button>
                         </div>
                         
-                        {/* Tombol Cetak */}
                         <div className="p-3 bg-blue-50 flex gap-3 justify-end border-b">
                             <button onClick={handleDownloadExcel} className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm flex items-center gap-2">
-                                <FaFileAlt /> Export Excel
+                                <FaFileAlt /> Excel
                             </button>
-                            <button onClick={handleDownloadPDF} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm flex items-center gap-2">
-                                <FaFileAlt /> Export PDF
+                            <button onClick={handlePrintBrowser} className="bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded text-sm flex items-center gap-2">
+                                <FaFileAlt /> Print PDF
                             </button>
                         </div>
 
-                        {/* Isi Tabel */}
                         <div className="p-4 overflow-y-auto">
                             <table className="w-full text-left border-collapse text-sm">
                                 <thead>
@@ -594,14 +747,25 @@ const ViewLaporan = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
-                                    {selectedDetail.data_json.map((row) => (
-                                        <tr key={row.rank} className={row.rank === 1 ? "bg-yellow-50" : ""}>
-                                            <td className="p-2 font-bold">#{row.rank}</td>
-                                            <td className="p-2">{row.judul_buku}</td>
-                                            <td className="p-2">{row.penulis}</td>
-                                            <td className="p-2 text-right font-bold text-blue-600">{row.total_nilai}</td>
+                                    {/* --- BAGIAN INI SUDAH DIAMANKAN --- */}
+                                    {(selectedDetail.data_json && selectedDetail.data_json.length > 0) ? (
+                                        selectedDetail.data_json.map((row, index) => (
+                                            <tr key={index} className={row.rank === 1 ? "bg-yellow-50" : ""}>
+                                                <td className="p-2 font-bold">#{row.rank || index + 1}</td>
+                                                <td className="p-2">{row.judul_buku || '-'}</td>
+                                                <td className="p-2">{row.penulis || '-'}</td>
+                                                <td className="p-2 text-right font-bold text-blue-600">
+                                                    {Number(row.total_nilai || 0).toFixed(4)}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan="4" className="p-8 text-center text-gray-400">
+                                                Data kosong atau rusak. Cek Console (F12).
+                                            </td>
                                         </tr>
-                                    ))}
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -632,6 +796,7 @@ const ViewUsers = () => {
 
     useEffect(() => { fetchUsers(); }, []);
 
+    // --- TAMBAH USER BARU ---
     const handleAddUser = async () => {
         const { value: formValues } = await Swal.fire({
             title: 'Tambah Admin Baru',
@@ -640,6 +805,7 @@ const ViewUsers = () => {
                 `<input id="u-user" class="swal2-input" placeholder="Username">` +
                 `<input id="u-pass" type="password" class="swal2-input" placeholder="Password">`,
             focusConfirm: false,
+            showCancelButton: true,
             preConfirm: () => {
                 return {
                     nama_lengkap: document.getElementById('u-nama').value,
@@ -651,18 +817,87 @@ const ViewUsers = () => {
 
         if (formValues) {
             try {
+                if(!formValues.nama_lengkap || !formValues.username || !formValues.password) {
+                    throw new Error("Semua field wajib diisi!");
+                }
                 await api.post('/users', formValues);
                 fetchUsers();
-                Swal.fire('User Ditambahkan', '', 'success');
-            } catch (err) { Swal.fire('Gagal', 'Error saat tambah user', 'error'); }
+                Swal.fire('Berhasil', 'User baru ditambahkan', 'success');
+            } catch (err) { 
+                Swal.fire('Gagal', err.response?.data?.msg || err.message, 'error'); 
+            }
         }
     };
 
+    // --- EDIT USER (BARU DITAMBAHKAN) ---
+    const handleEditUser = async (user) => {
+        const { value: formValues } = await Swal.fire({
+            title: 'Edit Data User',
+            html:
+                `<div class="text-left mb-1 text-sm font-bold text-gray-600">Nama Lengkap</div>` +
+                `<input id="u-nama" class="swal2-input" placeholder="Nama Lengkap" value="${user.nama_lengkap}">` +
+                
+                `<div class="text-left mt-3 mb-1 text-sm font-bold text-gray-600">Username</div>` +
+                `<input id="u-user" class="swal2-input" placeholder="Username" value="${user.username}">` +
+                
+                `<div class="text-left mt-3 mb-1 text-sm font-bold text-gray-600">Password Baru (Opsional)</div>` +
+                `<input id="u-pass" type="password" class="swal2-input" placeholder="Kosongkan jika tidak diganti">`,
+            focusConfirm: false,
+            showCancelButton: true,
+            preConfirm: () => {
+                return {
+                    nama_lengkap: document.getElementById('u-nama').value,
+                    username: document.getElementById('u-user').value,
+                    password: document.getElementById('u-pass').value // Bisa kosong
+                }
+            }
+        });
+
+        if (formValues) {
+            try {
+                // Kirim data ke backend (PUT)
+                await api.put(`/users/${user.id_user}`, formValues);
+                
+                // Refresh data
+                fetchUsers();
+                
+                // Kalau yang diedit diri sendiri, update nama di localstorage biar header berubah
+                const currentUser = localStorage.getItem('user_name');
+                if (user.username === currentUser) {
+                     localStorage.setItem('user_name', formValues.nama_lengkap);
+                     // Reload biar header update (opsional)
+                     window.location.reload(); 
+                } else {
+                     Swal.fire('Berhasil', 'Data user diperbarui!', 'success');
+                }
+
+            } catch (err) { 
+                Swal.fire('Gagal', err.response?.data?.msg || 'Gagal update user', 'error'); 
+            }
+        }
+    };
+
+    // --- HAPUS USER ---
     const handleDelete = async (id, username) => {
-        if (username === myUser) return Swal.fire('Error', 'Gabisa hapus diri sendiri!', 'error');
-        if((await Swal.fire({title:'Hapus?', icon:'warning', showCancelButton:true})).isConfirmed){
-            await api.delete(`/users/${id}`);
-            fetchUsers();
+        if (username === myUser) return Swal.fire('Error', 'Tidak bisa menghapus akun sendiri yang sedang login!', 'error');
+        
+        const result = await Swal.fire({
+            title: 'Hapus User?', 
+            text: `Yakin ingin menghapus ${username}?`,
+            icon: 'warning', 
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            confirmButtonText: 'Ya, Hapus!'
+        });
+
+        if(result.isConfirmed){
+            try {
+                await api.delete(`/users/${id}`);
+                fetchUsers();
+                Swal.fire('Terhapus!', 'User telah dihapus.', 'success');
+            } catch (error) {
+                Swal.fire('Gagal', 'Terjadi kesalahan.', 'error');
+            }
         }
     }
 
@@ -670,25 +905,44 @@ const ViewUsers = () => {
         <div className="bg-white p-6 rounded-2xl shadow-sm">
             <div className="flex justify-between items-center mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Kelola Pengguna</h2>
-                <button onClick={handleAddUser} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                <button onClick={handleAddUser} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2">
                     <FaPlus /> Tambah Admin
                 </button>
             </div>
             <div className="space-y-3">
                 {users.map((u) => (
-                    <div key={u.id_user} className="flex justify-between p-4 bg-gray-50 rounded-xl border">
-                        <div className="flex gap-3">
-                            <div className="w-10 h-10 bg-blue-500 rounded-full text-white flex items-center justify-center font-bold">
-                                {u.nama_lengkap.charAt(0).toUpperCase()}
+                    <div key={u.id_user} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl border hover:shadow-sm transition">
+                        <div className="flex gap-3 items-center">
+                            <div className="w-10 h-10 bg-blue-600 rounded-full text-white flex items-center justify-center font-bold shadow-md">
+                                {u.nama_lengkap ? u.nama_lengkap.charAt(0).toUpperCase() : '?'}
                             </div>
                             <div>
-                                <p className="font-bold text-gray-800">{u.nama_lengkap} {u.username === myUser && '(Saya)'}</p>
-                                <p className="text-xs text-gray-500">@{u.username}</p>
+                                <p className="font-bold text-gray-800">{u.nama_lengkap} {u.username === localStorage.getItem('user_name') && '(Saya)'}</p>
+                                <p className="text-xs text-gray-500 font-mono">@{u.username}</p>
                             </div>
                         </div>
-                        {u.username !== myUser && (
-                            <button onClick={() => handleDelete(u.id_user, u.username)} className="text-red-500 p-2"><FaTrash /></button>
-                        )}
+                        
+                        <div className="flex gap-2">
+                            {/* Tombol Edit */}
+                            <button 
+                                onClick={() => handleEditUser(u)} 
+                                className="bg-yellow-100 text-yellow-600 p-2 rounded-lg hover:bg-yellow-200 transition"
+                                title="Edit User"
+                            >
+                                <FaEdit />
+                            </button>
+
+                            {/* Tombol Hapus (Jangan tampilkan kalau user sendiri) */}
+                            {u.username !== localStorage.getItem('user_name') && (
+                                <button 
+                                    onClick={() => handleDelete(u.id_user, u.username)} 
+                                    className="bg-red-100 text-red-600 p-2 rounded-lg hover:bg-red-200 transition"
+                                    title="Hapus User"
+                                >
+                                    <FaTrash />
+                                </button>
+                            )}
+                        </div>
                     </div>
                 ))}
             </div>

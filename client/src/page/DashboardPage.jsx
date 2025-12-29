@@ -86,7 +86,7 @@ export default function DashboardPage() {
                     {sidebarOpen ? (
     <div className="text-center">
         <h1 className="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-400">
-            BUKU TERLARIS
+            SPK Aliyah Agency Book
         </h1>
         <p className="text-[10px] text-gray-400 tracking-widest">METODE SAW</p>
     </div>
@@ -456,28 +456,37 @@ const ViewKriteria = () => {
 const ViewHitungSAW = () => {
     const [hasil, setHasil] = useState([]);
     const [loading, setLoading] = useState(false);
-    const [bestOption, setBestOption] = useState(null); // Simpan Juara 1
+    const [bestOption, setBestOption] = useState(null); 
+    
+    // STATE BARU BUAT MODAL DETAIL & LIST KRITERIA
+    const [showModal, setShowModal] = useState(false);
+    const [kriteriaList, setKriteriaList] = useState([]);
 
+    // 1. Ambil Data Kriteria (Biar kita tau ID 1 itu namanya "Harga", dll)
+    const fetchKriteria = async () => {
+        try {
+            const res = await api.get('/kriteria');
+            setKriteriaList(res.data);
+        } catch (err) {}
+    };
+
+    // 2. Hitung SAW
     const hitungSAW = async () => {
         setLoading(true);
         try {
+            // Panggil API Kriteria dulu biar datanya siap
+            await fetchKriteria();
+
             const res = await api.get('/hitung-saw');
             const dataHasil = res.data.data || res.data; 
             setHasil(dataHasil);
 
-            // Ambil Juara 1 buat Rekomendasi
             if (dataHasil.length > 0) {
                 setBestOption(dataHasil[0]);
             }
             
-            Swal.fire({
-                icon: 'success',
-                title: 'Analisa Selesai!',
-                timer: 1000,
-                showConfirmButton: false
-            });
+            Swal.fire({ icon: 'success', title: 'Analisa Selesai!', timer: 1000, showConfirmButton: false });
         } catch (err) {
-            console.error(err);
             Swal.fire('Error', 'Gagal menghitung SAW.', 'error');
         } finally {
             setLoading(false);
@@ -486,37 +495,39 @@ const ViewHitungSAW = () => {
 
     useEffect(() => { hitungSAW(); }, []);
 
-    // Fungsi Simpan ke Laporan
+    // 3. Simpan Laporan
     const handleSimpanLaporan = async () => {
         if (hasil.length === 0) return Swal.fire('Data Kosong', 'Tidak ada hasil.', 'warning');
         const { value: judul } = await Swal.fire({
             title: 'Simpan Laporan',
             input: 'text',
-            inputLabel: 'Berikan Judul Laporan',
-            inputPlaceholder: 'Contoh: Rekomendasi Buku Terbaik 2024',
+            inputLabel: 'Judul Laporan',
             showCancelButton: true
         });
         if (judul) {
             try {
                 await api.post('/laporan', { keterangan: judul, data_json: JSON.stringify(hasil) });
                 Swal.fire('Berhasil', 'Laporan disimpan.', 'success');
-            } catch (error) {
-                Swal.fire('Gagal', 'Gagal menyimpan.', 'error');
-            }
+            } catch (error) { Swal.fire('Gagal', 'Gagal menyimpan.', 'error'); }
         }
     };
 
+    // 4. HELPER: Cari Nama Kriteria berdasarkan ID
+    const getNamaKriteria = (id) => {
+        const k = kriteriaList.find(item => item.id_kriteria === id);
+        return k ? k.nama_kriteria : `Kriteria ID ${id}`;
+    };
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 relative">
             
-            {/* --- BAGIAN 1: KOTAK SARAN / REKOMENDASI (INI YANG BARU) --- */}
+            {/* --- BAGIAN 1: REKOMENDASI UTAMA --- */}
             {bestOption && (
                 <motion.div 
                     initial={{ scale: 0.9, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden"
                 >
-                    {/* Hiasan Background */}
                     <div className="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
                     
                     <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
@@ -524,39 +535,30 @@ const ViewHitungSAW = () => {
                             <FaCalculator className="text-4xl text-yellow-300" />
                         </div>
                         <div className="flex-1 text-center md:text-left">
-                            <h3 className="text-sm font-bold uppercase tracking-widest text-indigo-200 mb-1">
-                                KEPUTUSAN SISTEM (SAW)
-                            </h3>
-                            <h2 className="text-3xl font-bold mb-2">
-                                Rekomendasi Utama: <span className="text-yellow-300">"{bestOption.judul_buku}"</span>
-                            </h2>
-                            <p className="text-indigo-100 text-sm leading-relaxed">
-                                Berdasarkan perhitungan algoritma SAW, buku ini memiliki nilai preferensi tertinggi 
-                                (<strong>{bestOption.total_nilai}</strong>). Buku ini unggul dalam kriteria yang memiliki bobot terbesar.
+                            <h3 className="text-sm font-bold uppercase tracking-widest text-indigo-200 mb-1">KEPUTUSAN SISTEM</h3>
+                            <h2 className="text-3xl font-bold mb-2">Rekomendasi: <span className="text-yellow-300">"{bestOption.judul_buku}"</span></h2>
+                            <p className="text-indigo-100 text-sm">
+                                Skor Tertinggi: <strong>{bestOption.total_nilai}</strong>
                             </p>
                         </div>
                         
-                        {/* Tombol Aksi Cepat */}
+                        {/* TOMBOL LIHAT DETAIL (SEKARANG SUDAH BERFUNGSI) */}
                         <div className="flex flex-col gap-2 min-w-[150px]">
-                            <button className="bg-white text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-50 transition shadow-lg text-sm">
-                                Lihat Detail
+                            <button 
+                                onClick={() => setShowModal(true)} // <--- INI FUNGSINYA
+                                className="bg-white text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-50 transition shadow-lg text-sm"
+                            >
+                                Lihat Detail Nilai
                             </button>
-                            {/* Tampilkan Runner Up (Juara 2) kalau ada */}
-                            {hasil.length > 1 && (
-                                <div className="text-xs text-center text-indigo-200 mt-2">
-                                    Alternatif ke-2: <br/> 
-                                    <strong>{hasil[1].judul_buku}</strong>
-                                </div>
-                            )}
                         </div>
                     </div>
                 </motion.div>
             )}
 
-            {/* --- BAGIAN 2: TABEL SEPERTI BIASA --- */}
+            {/* --- BAGIAN 2: TABEL --- */}
             <div className="bg-white p-6 rounded-2xl shadow-sm">
                 <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-gray-800">Rincian Perhitungan</h2>
+                    <h2 className="text-xl font-bold text-gray-800">Ranking Lengkap</h2>
                     <div className="flex gap-2">
                         <button onClick={hitungSAW} disabled={loading} className="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2 text-sm">
                             {loading ? '...' : <FaCalculator />} Refresh
@@ -574,42 +576,234 @@ const ViewHitungSAW = () => {
                                 <th className="p-3 text-center w-16">Rank</th>
                                 <th className="p-3">Judul Buku</th>
                                 <th className="p-3">Penulis</th>
-                                <th className="p-3 text-right">Skor (V)</th>
-                                <th className="p-3 text-center">Status</th>
+                                <th className="p-3 text-right">Skor Akhir (V)</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y text-sm">
                             {hasil.map((item, index) => (
                                 <tr key={index} className={`hover:bg-gray-50 ${item.rank === 1 ? 'bg-indigo-50' : ''}`}>
-                                    <td className="p-3 text-center">
-                                        {item.rank === 1 ? <span className="text-2xl">🥇</span> : 
-                                         item.rank === 2 ? <span className="text-xl">🥈</span> : 
-                                         item.rank === 3 ? <span className="text-xl">🥉</span> : `#${item.rank}`}
-                                    </td>
-                                    <td className="p-3 font-semibold text-gray-700">
-                                        {item.judul_buku}
-                                        {item.rank === 1 && <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] rounded-full uppercase font-bold">Sangat Disarankan</span>}
-                                    </td>
+                                    <td className="p-3 text-center">#{item.rank}</td>
+                                    <td className="p-3 font-semibold">{item.judul_buku}</td>
                                     <td className="p-3 text-gray-500">{item.penulis}</td>
-                                    <td className="p-3 text-right font-mono font-bold text-blue-600">
-                                        {item.total_nilai}
-                                    </td>
-                                    <td className="p-3 text-center">
-                                        {item.rank <= 3 ? (
-                                            <span className="text-green-600 font-bold text-xs">Layak Dipilih</span>
-                                        ) : (
-                                            <span className="text-gray-400 text-xs">Alternatif</span>
-                                        )}
-                                    </td>
+                                    <td className="p-3 text-right font-mono font-bold text-blue-600">{item.total_nilai}</td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            {/* --- BAGIAN 3: MODAL POPUP DETAIL PEMENANG (YANG BARU) --- */}
+            {showModal && bestOption && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <motion.div 
+                        initial={{ scale: 0.8, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+                    >
+                        {/* Header Modal */}
+                        <div className="bg-indigo-600 p-4 text-white flex justify-between items-center">
+                            <h3 className="font-bold text-lg">Kenapa Buku Ini Menang?</h3>
+                            <button onClick={() => setShowModal(false)} className="text-white/80 hover:text-white text-2xl">&times;</button>
+                        </div>
+
+                        {/* Body Modal */}
+                        <div className="p-6">
+                            <div className="text-center mb-6">
+                                <h2 className="text-2xl font-bold text-gray-800">{bestOption.judul_buku}</h2>
+                                <p className="text-gray-500">{bestOption.penulis}</p>
+                                <div className="mt-2 inline-block bg-green-100 text-green-700 px-3 py-1 rounded-full text-sm font-bold">
+                                    Skor Total: {bestOption.total_nilai}
+                                </div>
+                            </div>
+
+                            <h4 className="text-sm font-bold text-gray-600 mb-2 uppercase tracking-wide">Rincian Perolehan Poin:</h4>
+                            <div className="space-y-2">
+                                {bestOption.detail && bestOption.detail.map((d, i) => (
+                                    <div key={i} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border hover:border-indigo-300 transition">
+                                        <div>
+                                            <p className="font-bold text-gray-700 text-sm">{getNamaKriteria(d.id_kriteria)}</p>
+                                            <p className="text-xs text-gray-400">Nilai Normalisasi: {Number(d.normalisasi).toFixed(3)}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-indigo-600">{Number(d.poin).toFixed(4)}</p>
+                                            <p className="text-[10px] text-gray-400">Poin Akhir</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Footer Modal */}
+                        <div className="p-4 bg-gray-50 text-right border-t">
+                            <button onClick={() => setShowModal(false)} className="bg-gray-800 text-white px-4 py-2 rounded-lg hover:bg-gray-900 text-sm">
+                                Tutup
+                            </button>
+                        </div>
+                    </motion.div>
+                </div>
+            )}
+
         </div>
     );
 };
+// const ViewHitungSAW = () => {
+//     const [hasil, setHasil] = useState([]);
+//     const [loading, setLoading] = useState(false);
+//     const [bestOption, setBestOption] = useState(null); // Simpan Juara 1
+
+//     const hitungSAW = async () => {
+//         setLoading(true);
+//         try {
+//             const res = await api.get('/hitung-saw');
+//             const dataHasil = res.data.data || res.data; 
+//             setHasil(dataHasil);
+
+//             // Ambil Juara 1 buat Rekomendasi
+//             if (dataHasil.length > 0) {
+//                 setBestOption(dataHasil[0]);
+//             }
+            
+//             Swal.fire({
+//                 icon: 'success',
+//                 title: 'Analisa Selesai!',
+//                 timer: 1000,
+//                 showConfirmButton: false
+//             });
+//         } catch (err) {
+//             console.error(err);
+//             Swal.fire('Error', 'Gagal menghitung SAW.', 'error');
+//         } finally {
+//             setLoading(false);
+//         }
+//     };
+
+//     useEffect(() => { hitungSAW(); }, []);
+
+//     // Fungsi Simpan ke Laporan
+//     const handleSimpanLaporan = async () => {
+//         if (hasil.length === 0) return Swal.fire('Data Kosong', 'Tidak ada hasil.', 'warning');
+//         const { value: judul } = await Swal.fire({
+//             title: 'Simpan Laporan',
+//             input: 'text',
+//             inputLabel: 'Berikan Judul Laporan',
+//             inputPlaceholder: 'Contoh: Rekomendasi Buku Terbaik 2024',
+//             showCancelButton: true
+//         });
+//         if (judul) {
+//             try {
+//                 await api.post('/laporan', { keterangan: judul, data_json: JSON.stringify(hasil) });
+//                 Swal.fire('Berhasil', 'Laporan disimpan.', 'success');
+//             } catch (error) {
+//                 Swal.fire('Gagal', 'Gagal menyimpan.', 'error');
+//             }
+//         }
+//     };
+
+//     return (
+//         <div className="space-y-6">
+            
+//             {/* --- BAGIAN 1: KOTAK SARAN / REKOMENDASI (INI YANG BARU) --- */}
+//             {bestOption && (
+//                 <motion.div 
+//                     initial={{ scale: 0.9, opacity: 0 }}
+//                     animate={{ scale: 1, opacity: 1 }}
+//                     className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-xl relative overflow-hidden"
+//                 >
+//                     {/* Hiasan Background */}
+//                     <div className="absolute top-0 right-0 -mt-4 -mr-4 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl"></div>
+                    
+//                     <div className="relative z-10 flex flex-col md:flex-row items-center gap-6">
+//                         <div className="bg-white/20 p-4 rounded-full backdrop-blur-sm">
+//                             <FaCalculator className="text-4xl text-yellow-300" />
+//                         </div>
+//                         <div className="flex-1 text-center md:text-left">
+//                             <h3 className="text-sm font-bold uppercase tracking-widest text-indigo-200 mb-1">
+//                                 KEPUTUSAN SISTEM (SAW)
+//                             </h3>
+//                             <h2 className="text-3xl font-bold mb-2">
+//                                 Rekomendasi Utama: <span className="text-yellow-300">"{bestOption.judul_buku}"</span>
+//                             </h2>
+//                             <p className="text-indigo-100 text-sm leading-relaxed">
+//                                 Berdasarkan perhitungan algoritma SAW, buku ini memiliki nilai preferensi tertinggi 
+//                                 (<strong>{bestOption.total_nilai}</strong>). Buku ini unggul dalam kriteria yang memiliki bobot terbesar.
+//                             </p>
+//                         </div>
+                        
+//                         {/* Tombol Aksi Cepat */}
+//                         <div className="flex flex-col gap-2 min-w-[150px]">
+//                             <button className="bg-white text-indigo-700 font-bold py-2 px-4 rounded-lg hover:bg-indigo-50 transition shadow-lg text-sm">
+//                                 Lihat Detail
+//                             </button>
+//                             {/* Tampilkan Runner Up (Juara 2) kalau ada */}
+//                             {hasil.length > 1 && (
+//                                 <div className="text-xs text-center text-indigo-200 mt-2">
+//                                     Alternatif ke-2: <br/> 
+//                                     <strong>{hasil[1].judul_buku}</strong>
+//                                 </div>
+//                             )}
+//                         </div>
+//                     </div>
+//                 </motion.div>
+//             )}
+
+//             {/* --- BAGIAN 2: TABEL SEPERTI BIASA --- */}
+//             <div className="bg-white p-6 rounded-2xl shadow-sm">
+//                 <div className="flex justify-between items-center mb-6">
+//                     <h2 className="text-xl font-bold text-gray-800">Rincian Perhitungan</h2>
+//                     <div className="flex gap-2">
+//                         <button onClick={hitungSAW} disabled={loading} className="bg-gray-100 text-gray-600 px-4 py-2 rounded-lg hover:bg-gray-200 flex items-center gap-2 text-sm">
+//                             {loading ? '...' : <FaCalculator />} Refresh
+//                         </button>
+//                         <button onClick={handleSimpanLaporan} className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center gap-2 text-sm">
+//                             <FaSave /> Simpan
+//                         </button>
+//                     </div>
+//                 </div>
+
+//                 <div className="overflow-x-auto border rounded-xl">
+//                     <table className="w-full text-left border-collapse">
+//                         <thead className="bg-slate-800 text-white text-sm">
+//                             <tr>
+//                                 <th className="p-3 text-center w-16">Rank</th>
+//                                 <th className="p-3">Judul Buku</th>
+//                                 <th className="p-3">Penulis</th>
+//                                 <th className="p-3 text-right">Skor (V)</th>
+//                                 <th className="p-3 text-center">Status</th>
+//                             </tr>
+//                         </thead>
+//                         <tbody className="divide-y text-sm">
+//                             {hasil.map((item, index) => (
+//                                 <tr key={index} className={`hover:bg-gray-50 ${item.rank === 1 ? 'bg-indigo-50' : ''}`}>
+//                                     <td className="p-3 text-center">
+//                                         {item.rank === 1 ? <span className="text-2xl">🥇</span> : 
+//                                          item.rank === 2 ? <span className="text-xl">🥈</span> : 
+//                                          item.rank === 3 ? <span className="text-xl">🥉</span> : `#${item.rank}`}
+//                                     </td>
+//                                     <td className="p-3 font-semibold text-gray-700">
+//                                         {item.judul_buku}
+//                                         {item.rank === 1 && <span className="ml-2 px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] rounded-full uppercase font-bold">Sangat Disarankan</span>}
+//                                     </td>
+//                                     <td className="p-3 text-gray-500">{item.penulis}</td>
+//                                     <td className="p-3 text-right font-mono font-bold text-blue-600">
+//                                         {item.total_nilai}
+//                                     </td>
+//                                     <td className="p-3 text-center">
+//                                         {item.rank <= 3 ? (
+//                                             <span className="text-green-600 font-bold text-xs">Layak Dipilih</span>
+//                                         ) : (
+//                                             <span className="text-gray-400 text-xs">Alternatif</span>
+//                                         )}
+//                                     </td>
+//                                 </tr>
+//                             ))}
+//                         </tbody>
+//                     </table>
+//                 </div>
+//             </div>
+//         </div>
+//     );
+// };
 //     const handleSimpanLaporan = async () => {
 //         if (hasil.length === 0) return Swal.fire('Data Kosong', 'Tidak ada hasil untuk disimpan.', 'warning');
 

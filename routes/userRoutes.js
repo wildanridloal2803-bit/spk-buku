@@ -1,10 +1,15 @@
 import express from "express";
+import multer from "multer";
 // Perhatikan huruf 'u' kecil di awal, sesuai tree folder kamu
 import { getUsers, createUser, updateUser, deleteUser } from "../controllers/userController.js"; 
 import { verifyToken } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
-
+const storage = multer.memoryStorage();
+const upload = multer({ 
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 } // Batasi 5MB
+});
 // Route User (CRUD)
 router.get('/users', verifyToken, getUsers);
 router.post('/users', verifyToken, createUser);

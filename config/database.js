@@ -1,24 +1,45 @@
-import mysql from 'mysql2/promise'; // PENTING: Pakai versi promise
-import dotenv from 'dotenv';
+import mysql from "mysql2/promise";
+import dotenv from "dotenv";
 dotenv.config();
 
 const db = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASS || '',
-    database: process.env.DB_NAME || 'spk_pemilihan_buku',
+    host: process.env.DB_HOST,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASS,
+    database: process.env.DB_NAME,
+    port: process.env.DB_PORT || 4000,
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    ssl: {
+        minVersion: 'TLSv1.2',
+        rejectUnauthorized: true
+    }
 });
 
-// Cek koneksi (Opsional, buat debug aja)
-try {
-    const connection = await db.getConnection();
-    console.log("Database Connected via Pool!");
-    connection.release(); // Jangan lupa balikin koneksi ke kolam (pool)
-} catch (error) {
-    console.error("Database Error:", error);
-}
-
 export default db;
+
+// import mysql from 'mysql2/promise'; // PENTING: Pakai versi promise
+// import dotenv from 'dotenv';
+// dotenv.config();
+
+// const db = mysql.createPool({
+//     host: process.env.DB_HOST || 'localhost',
+//     user: process.env.DB_USER || 'root',
+//     password: process.env.DB_PASS || '',
+//     database: process.env.DB_NAME || 'spk_pemilihan_buku',
+//     waitForConnections: true,
+//     connectionLimit: 10,
+//     queueLimit: 0
+// });
+
+// // Cek koneksi (Opsional, buat debug aja)
+// try {
+//     const connection = await db.getConnection();
+//     console.log("Database Connected via Pool!");
+//     connection.release(); // Jangan lupa balikin koneksi ke kolam (pool)
+// } catch (error) {
+//     console.error("Database Error:", error);
+// }
+
+// export default db;

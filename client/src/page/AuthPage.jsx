@@ -19,24 +19,57 @@ export default function AuthPage() {
         e.preventDefault();
         setLoading(true);
         try {
-            // Tentukan endpoint backend
-            const endpoint = isLogin ? '/login' : '/register'; // Pastikan route backend sesuai
+            const endpoint = isLogin ? '/login' : '/register';
+            
+            console.log("🚀 1. Mengirim data ke:", endpoint, form); // Cek 1
+
             const res = await api.post(endpoint, form);
+            
+            console.log("✅ 2. Respon dari Backend:", res); // Cek 2
+            console.log("📦 3. Isi Data (res.data):", res.data); // Cek 3
 
             if (isLogin) {
-                // Simpan token dan data user
-                localStorage.setItem('token', res.data.token);
-                // Decode token atau simpan nama mentah (tergantung respon backend)
-                localStorage.setItem('user_name', form.username); 
+                // Pastikan kita ambil token yang BENAR
+                // Backend tadi kirim: { msg, token, accessToken, user }
+                const tokenDiambil = res.data.accessToken || res.data.token;
+
+                console.log("🔑 4. Token yang ditangkap:", tokenDiambil); // Cek 4
+
+                if (!tokenDiambil) {
+                    throw new Error("Token tidak ditemukan di respon backend!");
+                }
+
+                localStorage.setItem('token', tokenDiambil);
                 
+                // Simpan nama user (jaga-jaga kalau res.data.user ada isinya)
+                const namaUser = res.data.user ? res.data.user.nama : form.username;
+                localStorage.setItem('user_name', namaUser); 
+                
+                console.log("💾 5. Berhasil simpan ke LocalStorage"); // Cek 5
+
                 Swal.fire({ icon: 'success', title: 'Login Berhasil!', timer: 1500, showConfirmButton: false });
+                
+                console.log("navigating...");
                 navigate('/dashboard');
             } else {
                 Swal.fire('Berhasil!', 'Akun dibuat, silakan login.', 'success');
-                setIsLogin(true); // Pindah ke mode login
+                setIsLogin(true);
             }
         } catch (err) {
-            Swal.fire('Gagal', err.response?.data?.msg || 'Terjadi kesalahan', 'error');
+            console.error("🔥 ERROR TERTANGKAP:", err); // Cek Error Asli
+            
+            // Cek detail error axios
+            if (err.response) {
+                console.log("❌ Status:", err.response.status);
+                console.log("❌ Data Error:", err.response.data);
+                Swal.fire('Gagal', err.response.data.msg || 'Error dari server', 'error');
+            } else if (err.request) {
+                console.log("❌ Tidak ada respon dari server (Network Error)");
+                Swal.fire('Gagal', 'Server tidak merespon/mati', 'error');
+            } else {
+                console.log("❌ Error Kodingan:", err.message);
+                Swal.fire('Gagal', err.message, 'error');
+            }
         } finally {
             setLoading(false);
         }
